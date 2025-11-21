@@ -1,0 +1,37 @@
+{
+  "name": "mpa-backend",
+  "version": "1.0.0",
+  "description": "MPA Backend Server",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:simple": "node server-simple.js",
+    "start:direct": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@veramo/core": "^5.0.0",
+    "@veramo/credential-w3c": "^5.0.0",
+    "@veramo/data-store": "^5.0.0",
+    "@veramo/did-manager": "^5.0.0",
+    "@veramo/did-provider-key": "^5.0.0",
+    "@veramo/did-resolver": "^5.0.0",
+    "@veramo/key-manager": "^5.0.0",
+    "@veramo/kms-local": "^5.6.0",
+    "@veramo/remote-client": "^5.0.0",
+    "cors": "^2.8.5",
+    "did-resolver": "^4.0.0",
+    "dids": "^3.1.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.9.0",
+    "express": "^4.18.2",
+    "ipfs-http-client": "^60.0.1",
+    "multiformats": "^12.1.3",
+    "sqlite3": "^5.1.6",
+    "typeorm": "^0.3.17"
+  },
+  "engines": {
+    "node": ">=18.0.0 <=20.x"
+  }
+}
