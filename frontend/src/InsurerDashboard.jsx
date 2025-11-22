@@ -46,16 +46,25 @@ function InsurerDashboard() {
     setLoading(true);
     setMessage(null);
     try {
+      // Generate policy number and valid till date
+      const policyNumber = `POLICY-${Date.now().toString().slice(-5)}`;
+      const validTill = new Date();
+      validTill.setFullYear(validTill.getFullYear() + 1);
+      
       // Use the correct API format for policy VC
       const payload = {
         issuerDid: insurerDid,
         subjectDid: request.patientDid || `did:example:${request.patientAddress}`,
-        role: 'MedicalPolicy',
+        role: 'InsurancePolicy',
         data: {
+          credentialType: 'Insurance Policy',
+          policyNumber: policyNumber,
           policyId: request.id,
+          issuedTo: request.patientDid || `did:example:${request.patientAddress}`,
           insurer: wallet.account,
           beneficiary: request.patientAddress,
           coverageAmount: request.coverageAmount,
+          validTill: validTill.toISOString().split('T')[0],
           issuedAt: new Date().toISOString(),
         },
       };

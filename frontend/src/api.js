@@ -67,7 +67,7 @@ export const issueVC = async (data) => {
 };
 
 export const getVCByPolicyId = async (policyId) => {
-  const response = await api.get(`/vc/${policyId}`);
+  const response = await api.get(`/vc/policy/${policyId}`);
   return response.data;
 };
 

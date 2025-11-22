@@ -91,6 +91,27 @@ app.post('/vc/issue', async (req, res) => {
   }
 });
 
+// --- Get VC by policy ID ------------------------------------
+app.get('/vc/policy/:policyId', async (req, res) => {
+  try {
+    const { policyId } = req.params;
+    const { getVCByPolicyId } = await import('./vc-service.js');
+    const vc = getVCByPolicyId(policyId);
+    
+    if (vc) {
+      res.json({ success: true, vc });
+    } else {
+      res.json({ success: false, vc: null });
+    }
+  } catch (error) {
+    console.error('Get VC by policy ID failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get VC',
+    });
+  }
+});
+
 // --- start server ------------------------------------------
 app.listen(PORT, () => {
   console.log(`✅ Backend running on http://localhost:${PORT}`);

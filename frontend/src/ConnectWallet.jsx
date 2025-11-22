@@ -49,8 +49,21 @@ function ConnectWallet({ onWalletConnected }) {
           setAccount(null);
           setProvider(null);
           setSigner(null);
+          if (onWalletConnected) {
+            onWalletConnected({ account: null, provider: null, signer: null });
+          }
         } else {
           connectWallet();
+        }
+      });
+
+      // Listen for disconnect
+      window.ethereum.on('disconnect', () => {
+        setAccount(null);
+        setProvider(null);
+        setSigner(null);
+        if (onWalletConnected) {
+          onWalletConnected({ account: null, provider: null, signer: null });
         }
       });
     } catch (error) {
