@@ -1,14 +1,12 @@
 import { createAgent } from '@veramo/core';
 import { DIDManager } from '@veramo/did-manager';
 import { KeyManager } from '@veramo/key-manager';
-import { KeyManagementSystem } from '@veramo/kms-local';
-import { SecretBox } from '@veramo/kms-local';
+import { KeyManagementSystem, SecretBox } from '@veramo/kms-local';
 import { CredentialIssuer } from '@veramo/credential-w3c';
 import { DIDResolverPlugin } from '@veramo/did-resolver';
 import { Resolver } from 'did-resolver';
-import { getResolver as keyDidResolver } from '@veramo/did-provider-key';
-import { DataStore, DataStoreORM } from '@veramo/data-store';
-import { Entities, KeyStore, DIDStore, PrivateKeyStore } from '@veramo/data-store';
+import { KeyDIDProvider, getDidKeyResolver } from '@veramo/did-provider-key';
+import { DataStore, DataStoreORM, Entities, KeyStore, DIDStore, PrivateKeyStore } from '@veramo/data-store';
 import { DataSource } from 'typeorm';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -26,7 +24,7 @@ async function initializeVeramo() {
 
   initializationPromise = (async () => {
     try {
-      // Initialize database connection
+      // Initialize SQLite database
       if (!dbConnection || !dbConnection.isInitialized) {
         dbConnection = new DataSource({
           type: 'sqlite',
@@ -40,28 +38,32 @@ async function initializeVeramo() {
         console.log('✅ Veramo database initialized');
       }
 
-      const secretKey = process.env.SECRET_KEY || '29739248cad1bd1a0fc4d9b75cd4d2990de535baf5caadfdf8d8f86664aa830c';
+      const secretKey =
+        process.env.SECRET_KEY ||
+        '29739248cad1bd1a0fc4d9b75cd4d2990de535baf5caadfdf8d8f86664aa830c';
 
       agent = createAgent({
         plugins: [
           new KeyManager({
             store: new KeyStore(dbConnection),
             kms: {
-              local: new KeyManagementSystem(new PrivateKeyStore(dbConnection, new SecretBox(secretKey))),
+              local: new KeyManagementSystem(
+                new PrivateKeyStore(dbConnection, new SecretBox(secretKey)),
+              ),
             },
           }),
           new DIDManager({
             store: new DIDStore(dbConnection),
             defaultProvider: 'did:key',
             providers: {
-              'did:key': {
+              'did:key': new KeyDIDProvider({
                 defaultKms: 'local',
-              },
+              }),
             },
           }),
           new DIDResolverPlugin({
             resolver: new Resolver({
-              ...keyDidResolver(),
+              ...getDidKeyResolver(),
             }),
           }),
           new CredentialIssuer(),
@@ -81,8 +83,6 @@ async function initializeVeramo() {
   return initializationPromise;
 }
 
-// Export a function that returns a promise
-// This prevents top-level await from blocking server startup
 let agentPromise = null;
 
 export default function getVeramoAgent() {
@@ -91,4 +91,3 @@ export default function getVeramoAgent() {
   }
   return agentPromise;
 }
-

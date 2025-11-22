@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getPolicyRequests, issueVC, onchainIssuePolicy, onchainInsurerAction, createDID } from './api';
-import { createPolicyVC } from './vc-utils';
+import { getPolicyRequests, onchainIssuePolicy, onchainInsurerAction, createDID, issueCredential } from './api';
 import ConnectWallet from './ConnectWallet';
+import QRCode from 'qrcode';
 
 function InsurerDashboard() {
   const [wallet, setWallet] = useState(null);
@@ -11,6 +11,9 @@ function InsurerDashboard() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [createOnchain, setCreateOnchain] = useState(false);
   const [insurerDid, setInsurerDid] = useState(null);
+  const [vcForm, setVcForm] = useState({ organization: '', permission: '' });
+  const [vcInfo, setVcInfo] = useState(null);
+  const [vcQr, setVcQr] = useState('');
 
   useEffect(() => {
     loadRequests();
@@ -43,34 +46,26 @@ function InsurerDashboard() {
     setLoading(true);
     setMessage(null);
     try {
-      const credential = createPolicyVC(
-        request.id,
-        wallet.account,
-        request.patientAddress,
-        request.coverageAmount,
-        insurerDid
-      );
-
-      const issueData = {
-        credential,
+      // Use the correct API format for policy VC
+      const payload = {
         issuerDid: insurerDid,
-        createOnchain,
-        beneficiary: request.patientAddress,
-        coverageAmount: request.coverageAmount,
+        subjectDid: request.patientDid || `did:example:${request.patientAddress}`,
+        role: 'MedicalPolicy',
+        data: {
+          policyId: request.id,
+          insurer: wallet.account,
+          beneficiary: request.patientAddress,
+          coverageAmount: request.coverageAmount,
+          issuedAt: new Date().toISOString(),
+        },
       };
 
-      if (createOnchain) {
-        setMessage({ type: 'error', text: 'Please provide private key for on-chain operations' });
-        setLoading(false);
-        return;
-      }
-
-      const result = await issueVC(issueData);
+      const result = await issueCredential(payload);
 
       if (result.success) {
         setMessage({
           type: 'success',
-          text: `VC issued successfully! CID: ${result.cid}${result.onchainPolicyId ? `, On-chain Policy ID: ${result.onchainPolicyId}` : ''}`,
+          text: `VC issued successfully! CID: ${result.cid || 'N/A'}`,
         });
         loadRequests();
       } else {
@@ -92,29 +87,27 @@ function InsurerDashboard() {
     setLoading(true);
     setMessage(null);
     try {
-      const credential = createPolicyVC(
-        request.id,
-        wallet.account,
-        request.patientAddress,
-        request.coverageAmount,
-        insurerDid
-      );
-
-      const issueData = {
-        credential,
+      // Issue VC first
+      const payload = {
         issuerDid: insurerDid,
-        createOnchain: true,
-        insurerPrivateKey: privateKey,
-        beneficiary: request.patientAddress,
-        coverageAmount: request.coverageAmount,
+        subjectDid: request.patientDid || `did:example:${request.patientAddress}`,
+        role: 'MedicalPolicy',
+        data: {
+          policyId: request.id,
+          insurer: wallet.account,
+          beneficiary: request.patientAddress,
+          coverageAmount: request.coverageAmount,
+          issuedAt: new Date().toISOString(),
+        },
       };
 
-      const result = await issueVC(issueData);
+      const result = await issueCredential(payload);
 
       if (result.success) {
+        // Note: On-chain policy creation would go here if needed
         setMessage({
           type: 'success',
-          text: `VC issued and on-chain policy created! CID: ${result.cid}, Policy ID: ${result.onchainPolicyId}`,
+          text: `VC issued successfully! CID: ${result.cid || 'N/A'}`,
         });
         loadRequests();
       } else {
@@ -127,12 +120,103 @@ function InsurerDashboard() {
     }
   };
 
+  const handleGenerateInsurerVC = async () => {
+    if (!insurerDid) {
+      setMessage({ type: 'error', text: 'Create your insurer DID first' });
+      return;
+    }
+    setMessage(null);
+    setLoading(true);
+    try {
+      const payload = {
+        issuerDid: insurerDid,
+        subjectDid: insurerDid,
+        role: 'Insurer',
+        data: {
+          organization: vcForm.organization || 'Insurance Provider',
+          permission: vcForm.permission || 'Standard Issuer',
+          generatedAt: new Date().toISOString(),
+        },
+      };
+      const result = await issueCredential(payload);
+      setVcInfo(result.vc);
+      const qr = await QRCode.toDataURL(JSON.stringify(result.vc));
+      setVcQr(qr);
+      setMessage({ type: 'success', text: 'Insurer credential generated!' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message || 'Failed to generate credential' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-gray-800 mb-2">Insurer Dashboard</h1>
         <p className="text-gray-600">Review policy requests and issue verifiable credentials</p>
+      </div>
+
+      <div className="card animate-slide-up">
+        <div className="flex items-center mb-6">
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+            <span className="text-2xl">📄</span>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Insurer Credential</h2>
+            <p className="text-sm text-gray-500">Generate a credential for your insurer DID and share via QR</p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="label">Organization Name</label>
+            <input
+              type="text"
+              className="input-field"
+              value={vcForm.organization}
+              onChange={(e) => setVcForm({ ...vcForm, organization: e.target.value })}
+              placeholder="MPA Insurance"
+            />
+            <label className="label">Permission / Role</label>
+            <input
+              type="text"
+              className="input-field"
+              value={vcForm.permission}
+              onChange={(e) => setVcForm({ ...vcForm, permission: e.target.value })}
+              placeholder="Policy Issuer"
+            />
+            <button
+              className="btn btn-primary mt-3"
+              onClick={handleGenerateInsurerVC}
+              disabled={loading || !insurerDid}
+            >
+              {loading ? 'Generating...' : 'Generate Credential'}
+            </button>
+          </div>
+          <div>
+            {vcInfo ? (
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                {vcQr && (
+                  <div className="flex justify-center mb-4">
+                    <img
+                      src={vcQr}
+                      alt="Insurer VC QR"
+                      className="w-48 h-48 object-contain border rounded-lg bg-white"
+                    />
+                  </div>
+                )}
+                <pre className="text-xs bg-white p-2 rounded max-h-64 overflow-auto">
+                  {JSON.stringify(vcInfo, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm">
+                Credential details will appear here after generation.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Wallet Connection */}

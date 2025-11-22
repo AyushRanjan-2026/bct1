@@ -83,8 +83,13 @@ export async function issueVC(credential, issuerDid) {
     };
     saveVCStore(store);
 
-    // Upload to IPFS
-    const ipfsCid = await uploadToIPFS(JSON.stringify(verifiableCredential));
+    // Upload to IPFS (optional)
+    let ipfsCid = null;
+    try {
+      ipfsCid = await uploadToIPFS(JSON.stringify(verifiableCredential));
+    } catch (ipfsError) {
+      console.warn('IPFS upload skipped:', ipfsError.message);
+    }
 
     return {
       vc: verifiableCredential,
@@ -145,5 +150,28 @@ export function updatePolicyRequest(requestId, updates) {
     return requests[index];
   }
   return null;
+}
+
+export function createRoleCredential({ issuerDid, subjectDid, role, data = {} }) {
+  if (!issuerDid || !subjectDid || !role) {
+    throw new Error('issuerDid, subjectDid, and role are required to create a credential');
+  }
+
+  return {
+    '@context': [
+      'https://www.w3.org/2018/credentials/v1',
+      'https://www.w3.org/2018/credentials/examples/v1',
+    ],
+    type: ['VerifiableCredential', `${role}Credential`],
+    issuer: {
+      id: issuerDid,
+    },
+    issuanceDate: new Date().toISOString(),
+    credentialSubject: {
+      id: subjectDid,
+      role,
+      ...data,
+    },
+  };
 }
 

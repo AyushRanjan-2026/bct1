@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { createDID, requestPolicy, onchainRegister } from './api';
+import { createDID, requestPolicy, onchainRegister, issueCredential } from './api';
 import ConnectWallet from './ConnectWallet';
+import QRCode from 'qrcode';
 
 function PatientDashboard() {
   const [did, setDid] = useState(null);
@@ -11,6 +12,10 @@ function PatientDashboard() {
   const [message, setMessage] = useState(null);
   const [registered, setRegistered] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [vcForm, setVcForm] = useState({ fullName: '', notes: '' });
+  const [vcInfo, setVcInfo] = useState(null);
+  const [vcQr, setVcQr] = useState('');
+  const [vcStatus, setVcStatus] = useState(null);
 
   const handleCreateDID = async () => {
     setLoading(true);
@@ -94,6 +99,37 @@ function PatientDashboard() {
       }
     } catch (error) {
       setMessage({ type: 'error', text: error.message || 'Failed to submit policy request' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateVC = async () => {
+    if (!did) {
+      setVcStatus({ type: 'error', text: 'Create your DID first' });
+      return;
+    }
+    setVcStatus(null);
+    setLoading(true);
+    try {
+      const payload = {
+        issuerDid: did,
+        subjectDid: did,
+        role: 'Patient',
+        data: {
+          fullName: vcForm.fullName || 'Unknown Patient',
+          notes: vcForm.notes || 'Patient credential',
+          issuedAt: new Date().toISOString(),
+        },
+      };
+      const result = await issueCredential(payload);
+      setVcInfo(result.vc);
+      const qr = await QRCode.toDataURL(JSON.stringify(result.vc));
+      setVcQr(qr);
+      setVcStatus({ type: 'success', text: 'Credential generated!' });
+    } catch (error) {
+      console.error(error);
+      setVcStatus({ type: 'error', text: error.message || 'Failed to generate credential' });
     } finally {
       setLoading(false);
     }
@@ -267,6 +303,72 @@ function PatientDashboard() {
               </span>
             )}
           </button>
+        </div>
+      </div>
+
+      <div className="card animate-slide-up">
+        <div className="flex items-center mb-6">
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+            <span className="text-2xl">🔐</span>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Patient Verifiable Credential</h2>
+            <p className="text-sm text-gray-500">Generate a credential for your DID and share it via QR code</p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="label">Full Name</label>
+            <input
+              type="text"
+              className="input-field"
+              value={vcForm.fullName}
+              onChange={(e) => setVcForm({ ...vcForm, fullName: e.target.value })}
+              placeholder="Jane Doe"
+            />
+            <label className="label">Notes / Additional Info</label>
+            <textarea
+              className="input-field"
+              rows="3"
+              value={vcForm.notes}
+              onChange={(e) => setVcForm({ ...vcForm, notes: e.target.value })}
+              placeholder="Allergy info, blood group, etc."
+            />
+            <button
+              className="btn btn-primary mt-3"
+              onClick={handleGenerateVC}
+              disabled={loading || !did}
+            >
+              {loading ? 'Generating...' : 'Generate VC & QR'}
+            </button>
+            {vcStatus && (
+              <div className={vcStatus.type === 'error' ? 'error' : 'success'}>
+                {vcStatus.text}
+              </div>
+            )}
+          </div>
+          <div>
+            {vcInfo ? (
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                {vcQr && (
+                  <div className="flex justify-center mb-4">
+                    <img
+                      src={vcQr}
+                      alt="VC QR Code"
+                      className="w-48 h-48 object-contain border rounded-lg bg-white"
+                    />
+                  </div>
+                )}
+                <pre className="text-xs bg-white p-2 rounded max-h-64 overflow-auto">
+                  {JSON.stringify(vcInfo, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm">
+                Credential details will appear here after generation.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

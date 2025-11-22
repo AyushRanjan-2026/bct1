@@ -106,5 +106,10 @@ export const onchainInsurerAction = async (data) => {
   return response.data;
 };
 
+export const issueCredential = async (data) => {
+  const response = await api.post('/vc/issue', data);
+  return response.data;
+};
+
 export default api;
 
